@@ -128,21 +128,12 @@ public abstract class DirectedNode extends Node {
 	 */
 	public Double getClusteringCoefficient() {
 		ArrayList<Node> neighborhood = new ArrayList<Node>(outputs.size());
-		int neighborEdges = 0;
-		
+
 		for(Edge e : outputs) {
 			neighborhood.add(e.getOutput());
 		}
 		
-		for(Node n : neighborhood) {
-			for(Edge e : n.getOutputs()) {
-				if(!e.getOutput().equals(this) && neighborhood.contains(e.getOutput())) {
-					neighborEdges++;
-				}
-			}
-		}
-		
-		return new Double(neighborEdges / (Math.pow(neighborhood.size(), 2) - neighborhood.size()));
+		return new Double(1 / (Math.pow(neighborhood.size(), 2) - neighborhood.size())); 
 	}
 	
 	public abstract void receiveActionPotential(Edge input);

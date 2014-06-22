@@ -1,6 +1,6 @@
 /**
  * @author Steven L. Moxley
- * @version 1.1
+ * @version 1.2
  */
 package org.futurist.neuralnet;
 
@@ -8,8 +8,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.InputMismatchException;
 import java.util.Random;
+import java.util.Stack;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import javafx.scene.layout.GridPane;
 
@@ -17,7 +20,6 @@ import org.futurist.neuralnet.node.DirectedNode;
 import org.futurist.neuralnet.node.DirectedSumNode;
 import org.futurist.neuralnet.node.Node;
 import org.futurist.neuralnet.node.UndirectedNode;
-
 import org.apache.commons.math3.distribution.*;
 
 public class Network extends Thread {
@@ -25,6 +27,7 @@ public class Network extends Thread {
 	public static final Integer DEFAULT_LENGTH = 100;
 	public static final Integer DEFAULT_WIDTH = 100;
 	public static final Integer DEFAULT_HEIGHT = 100;
+	public static final Integer DEFAULT_SEARCH_DIST = 1000;
 
 	protected final Integer id;
 	protected final Random rng;							// random node selector
@@ -435,8 +438,8 @@ public class Network extends Thread {
 	/**
 	 * Prints statistics of this <code>Network</code>.
 	 */
-	public void printStats() {
-		System.out.println("There are " + nodes.size() + " neuron nodes and " + edges.size() + " synaptic edges in " + functionalUnits.size() + " functional units.");
+	public String getStats() {
+		String stats = "There are " + nodes.size() + " neuron nodes and " + edges.size() + " synaptic edges in " + functionalUnits.size() + " functional units.\n";
 
 		// Node statistics
 		Double nodeInputSum = 0.0;
@@ -472,13 +475,13 @@ public class Network extends Thread {
 		}
 
 		// print average Node statistics
-		System.out.println("Each neuron has an average of " + nodeInputSum/nodes.size() + " synaptic inputs.");
-		System.out.println("Each neuron has an average of " + nodeOutputSum/nodes.size() + " synaptic outputs.");
-		System.out.println("Each neuron has an average value of " + nodeValueSum/nodes.size() + ".");
-		System.out.println("Each neuron has an average threshold of " + nodeThresholdSum/nodes.size() + ".");
-		System.out.println("The average degree centrality of all neurons in the network is " + nodeDegreeSum/nodes.size() + ".");
-		System.out.println("The average clustering coefficient of all neurons in the network is " + nodeClusterSum/nodes.size() + ".");
-		System.out.println("The average closeness centrality of all neurons in the network is " + nodeClosenessSum/nodes.size() + ".");
+		stats += "Each neuron has an average of " + nodeInputSum/nodes.size() + " synaptic inputs.\n";
+		stats += "Each neuron has an average of " + nodeOutputSum/nodes.size() + " synaptic outputs.\n";
+		stats += "Each neuron has an average value of " + nodeValueSum/nodes.size() + ".\n";
+		stats += "Each neuron has an average threshold of " + nodeThresholdSum/nodes.size() + ".\n";
+		stats += "The average degree centrality of all neurons in the network is " + nodeDegreeSum/nodes.size() + ".\n";
+		stats += "The average clustering coefficient of all neurons in the network is " + nodeClusterSum/nodes.size() + ".\n";
+		stats += "The average closeness centrality of all neurons in the network is " + nodeClosenessSum/nodes.size() + ".\n";
 		//System.out.println("The average betweenness centrality of all neurons in the network is " + nodeBetweennesSum/nodes.size() + ".");
 
 		// Edge statistics
@@ -486,25 +489,67 @@ public class Network extends Thread {
 		for(Edge e : edges) {
 			edgeWeightSum += e.getWeight();
 		}
-		System.out.println("The average edge weight is " + edgeWeightSum/edges.size() + ".");
+		stats += "The average edge weight is " + edgeWeightSum/edges.size() + ".\n";
 
 		// Network properties from http://en.wikipedia.org/wiki/Network_science#Network_Properties on April 21, 2012
 		// The density D of a network is defined as a ratio of the number of edges E to the number of possible edges, given by the binomial coefficient \tbinom N2, giving D = \frac{2E}{N(N-1)}.
 		Double density = (2*edges.size()) / (Math.pow(nodes.size(), 2) - nodes.size());
-		System.out.println("The density of the neural network is: " + density + ".");
+		stats += "The density of the neural network is: " + density + ".\n";
 
-		// UPGRADE: shortest, mean, and longest path lengths
-		//System.out.println("The shortest path between neurons is " + shortest + " synapses.");
-		//System.out.println("The diameter of the neural network (longest path) is " + longest + ".");
+		// breadth-first search
+		stats += "The distances of neurons visited in a breadth-first search from the first neuron is:\n";
+		Double[] bfsOrder = breadthFirstSearch((DirectedSumNode) nodes.get(0));
+		String bfs = "";
+		for(Double i : bfsOrder) { bfs += i + ", "; };
+		bfs = bfs.substring(0, bfs.lastIndexOf(","));
+		stats += bfs + "\n";
+
+		// depth-first search
+		stats += "The distances of neurons visited in a depth-first search from the first neuron is:\n";
+		Integer[] dfsOrder = depthFirstSearch((DirectedSumNode) nodes.get(0));
+		String dfs = "";
+		for(Integer i : dfsOrder) { dfs += i + ", "; };
+		dfs = dfs.substring(0, dfs.lastIndexOf(","));
+		stats += dfs + "\n";
+
+		// Dijkstra's shortest path
+		stats += "The distances of neurons visited in Dijkstra's shortest path from the first neuron is:\n";
+		Double[] dOrder = dijkstraShortestPath((DirectedSumNode) nodes.get(0));
+		String d = "";
+		for(Double i : dOrder) { d += i + ", "; };
+		d = d.substring(0, d.lastIndexOf(","));
+		stats += d + "\n";
+
+		// Bellman-Ford shortest path
+		stats += "The distances of neurons visited in Bellman-Ford shortest path from the first neuron is:\n";
+		Double[] bfOrder = bellmanFordShortestPath((DirectedSumNode) nodes.get(0));
+		String bf = "";
+		for(Double i : bfOrder) { bf += i + ", "; };
+		bf = bf.substring(0, bf.lastIndexOf(","));
+		stats += bf + "\n";
+
+		// Floyd-Warshall shortest path
+		/*
+		stats += "The shortest weighted paths determined by Floyd-Warshall are: \n";
+		floydWarshallShortestPath((DirectedSumNode) nodes.get(0), (DirectedSumNode) nodes.get(nodes.size()-1));
+		for(int i = 0; i < shortestPaths.length; i++) { 
+			for(int j = 0; j < shortestPaths[i].length; j++) { 
+				stats += shortestPaths[i][j] + "\t";
+			}
+			stats += "\n";
+		}
+		 */
 
 		if(simulated) {
 			Double nodeFireSum = 0.0;
 			for(Node n : nodes) {
 				nodeFireSum += n.getNumFires();
 			}
-			System.out.println("There were " + nodeFireSum + " neuron firings during the simulation, an average of " + nodeFireSum/nodes.size() + " per neuron.");
+			stats += "There were " + nodeFireSum + " neuron firings during the simulation, an average of " + nodeFireSum/nodes.size() + " per neuron.\n";
 		}
-		System.out.println();
+		stats += "\n";
+
+		return stats;
 	}
 
 	/** 
@@ -648,13 +693,6 @@ public class Network extends Thread {
 		return rng;
 	}
 
-	/*
-	 * UPGRADE: calculate the shortest path between 2 arbitrary nodes (up to the given maximum distance)
-	public Edge[] getShortestPath(Node from, Node to, Integer maxHops) {
-
-	}
-	 */
-
 	/** 
 	 * Returns the value of the sigmoid function after operating on the given input.
 	 * @param x the input to the sigmoid function.
@@ -699,4 +737,373 @@ public class Network extends Thread {
 		}
 		return result;
 	}
+
+	/**
+	 * Used internally by depthFirstSearch() to visit a node in the network.
+	 */
+	private void DFVisit(Integer id, Integer[] d, Integer[] f, Integer[] p, Integer[] s, Integer[] l) {
+		Integer uID = id;
+		DirectedNode u = (DirectedNode) nodes.get(uID);
+		Integer count = 0;
+		s[uID] = 0;
+		d[uID] = ++count;
+
+		// process neighbors
+		for(Edge e : u.getOutputs()) {
+			DirectedNode v = (DirectedNode) e.getOutput();
+			Integer vID = 0;
+			for(int i = 0; i < nodes.size(); i++) {
+				if(nodes.get(i).equals(v)) {
+					vID = i;
+				}
+			}
+			l[uID] = 3;
+			if(s[vID] == -1) {
+				l[uID] = 0;
+			} else if(s[vID] == 0) {
+				l[uID] = 1;
+			} else if(d[uID] < d[vID]) {
+				l[uID] = 2;
+			}
+
+			if(s[vID] == -1) {
+				p[vID] = uID;
+				DFVisit(vID, d, f, p, s, l);
+			}
+
+			s[uID] = 1;
+			f[uID] = ++count;
+		}
+	}
+
+	/**
+	 * Depth-first visiting of a node in the network.  -1 means the node has not yet been visited; 0 means the node has been visited, but may have adjacent nodes that have not been visited; 1 means the node and all its neighbors have been visited.
+	 * Best O(nodes + edges); average O(nodes + edges); worst O(nodes + edges)
+	 * @see Heineman, Pollice and Selkow, 144
+	 * @return Integer[] representation of the order in which nodes were visited during the search.  Each index number corresponds to the output of getNodes().
+	 */
+	public Integer[] depthFirstSearch(DirectedNode begin) {
+
+		Integer srcID = 0;
+		Integer n = nodes.size();
+		Integer[] pred = new Integer[n];
+		Integer[] discovered = new Integer[n];
+		Integer[] finished = new Integer[n];
+		Integer[] state = new Integer[n];
+		Integer[] label = new Integer[n];
+
+		for(int i = 0; i < n; i++) {
+			pred[i] = -1;
+			discovered[i] = -1;
+			finished[i] = -1;
+			state[i] = -1;
+			label[i] = -1;
+			if(nodes.get(i).equals(begin)) {
+				srcID = i;
+			}
+		}
+
+		DFVisit(srcID, pred, discovered, finished, state, label);
+		for(int u = 0; u < n; u++) {
+			if(state[u] == -1) {
+				DFVisit(u, pred, discovered, finished, state, label);
+			}
+		}
+
+		return finished;
+	}
+
+	/**
+	 * Depth-first search of the network.
+	 * Best O(branching * depth); average O(branching * depth); worst O(branching * depth)
+	 * @see Heineman, Pollice and Selkow, 182.
+	 * @return Integer the distance from begin to end.
+	 */
+	public Double depthFirstSearch(DirectedNode begin, DirectedNode end) {
+
+		Double dist = 0.0;
+		if(begin.equals(end)) {
+			return dist;
+		}
+		Stack<DirectedNode> open = new Stack<DirectedNode>();
+		HashSet<DirectedNode> closed = new HashSet<DirectedNode>();
+		open.push(begin);
+
+		while(open.size() > 0) {
+			DirectedNode n = open.pop();
+			closed.add(n);
+
+			for(Edge e : n.getOutputs()) {
+				DirectedNode m = (DirectedNode) e.getOutput();
+				if(!closed.contains(m)) {
+					dist += e.getWeight();
+					if(n.equals(end)) {
+						return dist;
+					}
+					if(dist < DEFAULT_SEARCH_DIST) {
+						open.push(m);
+					}
+				}
+			}
+		}
+
+		return -1.0;
+	}
+
+	/**
+	 * Breadth-first search of the network.
+	 * @see Heineman, Pollice and Selkow, 150.
+	 * Best O(nodes + edges); average O(nodes + edges); worst O(nodes + edges)
+	 * @return Integer[] representation of the order in which nodes were visited during the search.  Each index number corresponds to the output of getNodes().
+	 */
+	public Double[] breadthFirstSearch(DirectedNode begin) {
+
+		Integer srcID = 0;
+		Integer n = nodes.size();
+		Integer[] pred = new Integer[n];
+		Double[] dist = new Double[n];
+		Integer[] state = new Integer[n];
+
+		for(int i = 0; i < n; i++) {
+			pred[i] = -1;
+			dist[i] = Double.MAX_VALUE;
+			state[i] = -1;
+			if(nodes.get(i).equals(begin)) {
+				srcID = i;
+			}
+		}
+
+		dist[srcID] = 0.0;
+		state[srcID] = 0;
+
+		ConcurrentLinkedQueue<DirectedNode> queue = new ConcurrentLinkedQueue<DirectedNode>();
+		queue.add(begin);
+		while(queue.size() > 0) {
+			DirectedNode u = queue.remove();
+			Integer uID = 0;
+			for(int i = 0; i < n; i++) {
+				if(nodes.get(i).equals(u)) {
+					uID = i;
+				}
+			}
+			for(Edge e : u.getOutputs()) {
+				DirectedNode v = (DirectedNode) e.getOutput();
+				Integer vID = 0;
+				for(int i = 0; i < n; i++) {
+					if(nodes.get(i).equals(v)) {
+						vID = i;
+					}
+				}
+				if(state[vID] == -1) {
+					dist[vID] = dist[uID] + e.getWeight();
+					pred[vID] = uID;
+					state[vID] = 0;
+					queue.add(v);
+				}
+			}
+
+			state[uID] = 1;
+		}
+
+		return dist;
+	}
+
+	/**
+	 * Breadth-first search of the network.
+	 * @see Heineman, Pollice and Selkow, 190.
+	 * Best O(branching^depth); average O(branching^depth); worst O(branching^depth)
+	 * @return Integer the distance from begin to end. 
+	 */
+	public Double breadthFirstSearch(DirectedNode begin, DirectedNode end) {
+		Double dist = 0.0;
+		if(begin.equals(end)) {
+			return dist;
+		}
+		ConcurrentLinkedQueue<DirectedNode> open = new ConcurrentLinkedQueue<DirectedNode>();
+		open.add(begin);
+
+		HashSet<DirectedNode> closed = new HashSet<DirectedNode>();
+
+		while(open.size() > 0) {
+			DirectedNode n = open.remove();
+			closed.add(n);
+
+			for(Edge e : n.getOutputs()) {
+				DirectedNode m = (DirectedNode) e.getOutput();
+				if(!closed.contains(m)) {
+					dist += e.getWeight();
+					if(n.equals(end)) {
+						return dist;
+					}
+				}
+			}
+		}
+
+		return -1.0;
+	}
+
+	/**
+	 * Dijkstra's single-source shortest path algorithm for dense graphs.
+	 * @see Heineman, Pollice and Selkow, 158.
+	 * Best O(nodes^2 + edges); average O(nodes^2 + edges); worst O(nodes^2 + edges)
+	 * @return Integer[] representation of the order in which nodes were visited during the search.  Each index number corresponds to the output of getNodes().
+	 */
+	public Double[] dijkstraShortestPath(DirectedNode begin) {
+
+		Integer uID = 0;
+		Integer n = nodes.size();
+		Integer[] pred = new Integer[n];
+		Double[] dist = new Double[n];
+		Boolean[] visit = new Boolean[n];
+
+		for(int i = 0; i < n; i++) {
+			pred[i] = -1;
+			dist[i] = Double.MAX_VALUE;
+			visit[i] = false;
+			if(nodes.get(i).equals(begin)) {
+				uID = i;
+			}
+		}
+
+		dist[uID] = 0.0;
+		DirectedNode u = begin;
+		Double sd = Double.MAX_VALUE;
+		for(int i = 0; i < n; i++) {
+			if(!visit[i] && dist[i] < sd) {
+				sd = dist[i];
+				uID = i;
+			}
+			if(uID == -1) { break; }
+
+			visit[uID] = true;
+			for(Integer vID = 0; vID < u.getOutputs().size(); vID++) {
+				Double newLen = dist[uID] + u.getOutputs().get(vID).getWeight();
+				if(newLen < dist[vID]) {
+					dist[vID] = newLen;
+					pred[vID] = uID;
+				}
+			}
+		}
+		return dist;
+	}
+
+	/**
+	 * Bellman-Ford single-source shortest path algorithm.
+	 * @see Heineman, Pollice and Selkow, 162.
+	 * Best O(nodes * edges); average O(nodes * edges); worst O(nodes * edges)
+	 * @return Integer[] representation of the order in which nodes were visited during the search.  Each index number corresponds to the output of getNodes().
+	 */
+	public Double[] bellmanFordShortestPath(DirectedNode begin) {
+
+		Integer uID = 0;
+		Integer n = nodes.size();
+		Integer[] pred = new Integer[n];
+		Double[] dist = new Double[n];
+
+		for(int i = 0; i < n; i++) {
+			pred[i] = -1;
+			dist[i] = Double.MAX_VALUE;
+			if(nodes.get(i).equals(begin)) {
+				uID = i;
+			}
+		}
+		dist[uID] = 0.0;
+		DirectedNode u = begin;
+
+		for(int i = 1; i < n; i++) {
+			Boolean leaveEarly = true;
+			for(uID = 0; uID < n; uID++) {
+				for(Integer vID = 0; vID < u.getOutputs().size(); vID++) {
+					Double newLen = dist[uID] + u.getOutputs().get(vID).getWeight();
+					if(newLen < dist[vID]) {
+						dist[vID] = newLen;
+						pred[vID] = uID;
+						leaveEarly = false;
+					}
+				}
+			}
+			if(leaveEarly) { break; }
+		}
+
+		return dist;
+	}
+
+	/**
+	 * Floyd-Warshall all-sources shortest path algorithm.
+	 * @see Heineman, Pollice and Selkow, 166.
+	 * Best O(nodes^3); average O(nodes^3); worst O(nodes^3)
+	 * @return Integer[] representation of the order in which nodes were visited during the search.  Each index number corresponds to the output of getNodes().
+	 */
+	public void floydWarshallShortestPath(DirectedNode begin, DirectedNode end) {
+
+		Integer uID = 0;
+		Integer vID = 0;
+		Integer n = nodes.size();
+		Integer[][] pred = new Integer[n][n];
+		Double[][] dist = new Double[n][n];
+
+		for(uID = 0; uID < n; uID++) {
+			DirectedNode u = (DirectedNode) nodes.get(uID);
+
+			for(vID = 0; vID < n; vID++) {
+				dist[uID][vID] = Double.MAX_VALUE;
+				pred[uID][vID] = -1;
+			}
+
+			dist[uID][uID] = 0.0;
+			for(vID = 0; vID < u.getOutputs().size(); vID++) {
+				dist[uID][vID] = u.getOutputs().get(vID).getWeight();
+				pred[uID][vID] = uID;
+			}
+		}
+
+		for(int k = 0; k < n; k++) {
+			for(int i = 0; i < n; i++) {
+				if(dist[i][k] == Integer.MAX_VALUE) { continue; }
+
+				for(int j = 0; j < n; j++) {
+					Double newLen = dist[i][k] + dist[k][j];
+
+					if(newLen < dist[i][j]) {
+						dist[i][j] = newLen;
+						pred[i][j] = pred[k][j];
+					}
+				}
+			}
+		}
+
+		shortestPaths = dist;
+
+		/**
+		 * re-create the path
+		Stack<Integer> path = new Stack<Integer>();
+		for(int i = 0; i < n; i++) { 
+			if(nodes.get(i).equals(begin)) {
+				uID = i;
+			} else if(nodes.get(i).equals(end)) {
+				vID = i;
+			}
+		}
+		while(begin != end) {
+			if(pred[uID][vID] == -1) {
+				path = new Stack<Integer>();
+			}
+			path.push(pred[uID][vID]);
+		}
+
+		return (Integer[]) path.toArray();
+		 */
+	}
+
+	/**
+	 * A*Search algorithm
+	 * @see Heineman, Pollice and Selkow, 195.
+	 * Best O(branching * depth); average O(branching^depth); worst O(branching^depth)
+	 */
+
+	/**
+	 * Ford-Fulkerson maximum network flow algorithm.
+	 * @see Heineman, Pollice and Selkow, 230.
+	 * Best O(edges * maxFlow); average O(edges * maxFlow); worst O(edges * maxFlow)
+	 */
 }

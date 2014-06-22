@@ -1,9 +1,12 @@
 /**
  * @author Steven L. Moxley
- * @version 1.0
+ * @version 1.2
  */
 package org.futurist.neuralnet;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,6 +38,7 @@ public class Playground {
 		ConcurrentHashMap<Double, Double> learnRateTest = new ConcurrentHashMap<Double, Double>();
 		ConcurrentHashMap<Double, Double> learnScaleTest = new ConcurrentHashMap<Double, Double>();
 		ConcurrentHashMap<Integer, Double> numRoundsTest = new ConcurrentHashMap<Integer, Double>();
+		String outputFile = "C:\\Users\\smoxley\\Downloads\\network-stats.txt";
 
 		// default values to use prior to testing
 		Integer numLevels = 3;  // 1 hidden layer usually sufficient
@@ -67,7 +71,14 @@ public class Playground {
 			}
 			//defaultNet.printNodes();
 			//defaultNet.printEdges();
-			defaultNet.printStats();
+			File output = new File(outputFile);
+			try {
+				FileWriter writer = new FileWriter(output);
+				writer.write(defaultNet.getStats());
+				writer.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 
 			// test initial weighting by distribution		
 			ArrayList<AbstractRealDistribution> dists = new ArrayList<AbstractRealDistribution>();

@@ -1,6 +1,6 @@
 /**
  * @author Steven L. Moxley
- * @version 1.0
+ * @version 1.2
  * To do for next release: implement getClosenessCentrality() and getBetweennessCentrality()
  */
 package org.futurist.neuralnet.node;

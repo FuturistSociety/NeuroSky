@@ -1,0 +1,5 @@
+This software has been tested with 64-bit Java 8 on Windows 7, SP 1 and on OS X 10.9.3.  The code runs well with the compile flags '-Xms2g -Xmx4g'
+
+In the base neuralnet package, Playground.java creates multiple neural networks and treats them as differential functions.  That is, one of the Network's parameters is varied while the others are fixed at default values.  Each variation's performance is ranked by the output neurons' error in prediction (randomized) values.  The neural network simulation may take a few minutes to run.  Changing the number of neurons per layer, the number of layers, and the number of synapses has the greatest impact on performance. 
+
+In the neuralnet.evolve package, Playground.java illustrates how to use a genetic algorithm with default and user-specified parameters.  Simply construct an instance of the Evolver class with whatever data you want to consider "fittest" and call the getFittestNetwork() to get the neural network most suited to learn that data.  The genetic algorithm may take up to 15 minutes to run, even on high-end hardware.  Changing the population size and number of generations has the greatest impact on performance.

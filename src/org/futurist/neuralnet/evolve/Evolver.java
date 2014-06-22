@@ -1,6 +1,6 @@
 /**
  * @author Steven L. Moxley
- * @version 0.1
+ * @version 1.2
  */
 package org.futurist.neuralnet.evolve;
 
